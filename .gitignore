@@ -1,0 +1,8 @@
+node_modules/
+dist/
+bundled-server.js
+sea-prep.blob
+*.blob
+*.exe
+.DS_Store
+Thumbs.db

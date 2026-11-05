@@ -1,0 +1,23 @@
+{
+  "name": "agent-monitor-desktop",
+  "version": "1.0.0",
+  "description": "Multi-Agent Realtime Usage & Throughput Desktop Monitor",
+  "main": "launch-desktop.js",
+  "scripts": {
+    "start": "node launch-desktop.js",
+    "server": "node server.js"
+  },
+  "keywords": [
+    "agent",
+    "monitoring",
+    "tokens",
+    "tps",
+    "dashboard",
+    "desktop"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "@yao-pkg/pkg": "^6.25.0"
+  }
+}

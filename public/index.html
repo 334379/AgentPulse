@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentPulse - 多 Agent 实时用量与吞吐监控台</title>
+  <style>
+    :root {
+      --bg-base: #0a0d14;
+      --bg-surface: #111726;
+      --bg-card: #161f33;
+      --bg-card-hover: #1c2740;
+      --border-subtle: #22304d;
+      --border-bright: #385080;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --primary: #3b82f6;
+      --primary-glow: rgba(59, 130, 246, 0.25);
+      --success: #10b981;
+      --success-glow: rgba(16, 185, 129, 0.25);
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --accent-purple: #8b5cf6;
+      --accent-cyan: #06b6d4;
+      --accent-pink: #ec4899;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* 自定义滚动条 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-base);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-subtle);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--border-bright);
+    }
+
+    /* 顶部导航栏 */
+    header {
+      background: rgba(17, 23, 38, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      background: linear-gradient(to right, #ffffff, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 1px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+    }
+
+    .status-dot.disconnected {
+      background: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
+    }
+
+    /* 按钮组 */
+    .btn {
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid transparent;
+      outline: none;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #1d4ed8;
+      box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      border-color: var(--border-subtle);
+      color: var(--text-muted);
+    }
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border-color: var(--border-bright);
+    }
+
+    .btn-simulator {
+      background: rgba(139, 92, 246, 0.15);
+      border-color: rgba(139, 92, 246, 0.4);
+      color: #c4b5fd;
+    }
+    .btn-simulator.active {
+      background: #8b5cf6;
+      color: #ffffff;
+      box-shadow: 0 0 14px rgba(139, 92, 246, 0.4);
+    }
+
+    /* 页面主体 */
+    main {
+      padding: 20px 24px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex: 1;
+      max-width: 1720px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* 顶部 KPI 卡片网格 */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 16px;
+    }
+
+    .kpi-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .kpi-card:hover {
+      border-color: var(--border-bright);
+    }
+
+    .kpi-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .kpi-title {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .kpi-icon {
+      font-size: 16px;
+      opacity: 0.7;
+    }
+
+    .kpi-value {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-main);
+      font-feature-settings: "tnum";
+      line-height: 1.2;
+    }
+
+    .kpi-unit {
+      font-size: 13px;
+      color: var(--text-dim);
+      font-weight: normal;
+      margin-left: 4px;
+    }
+
+    .kpi-sub {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .kpi-sub span.highlight {
+      color: var(--accent-cyan);
+    }
+
+    /* 核心图表区域 (二列布局) */
+    .dashboard-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 1100px) {
+      .dashboard-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .card-title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .card-subtitle {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .card-tools {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 图表容器 */
+    .chart-container {
+      position: relative;
+      flex: 1;
+      min-height: 280px;
+      width: 100%;
+    }
+
+    canvas#realtimeChart {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Agent 图例筛选勾选条 */
+    .chart-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 3px 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      transition: background 0.2s;
+    }
+    .legend-item:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
+    }
+    .legend-item.dimmed {
+      opacity: 0.35;
+      text-decoration: line-through;
+    }
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* 仪表盘区域 */
+    .gauge-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 220px;
+      position: relative;
+    }
+
+    canvas#gaugeCanvas {
+      width: 220px;
+      height: 140px;
+    }
+
+    .gauge-label {
+      text-align: center;
+      margin-top: -15px;
+    }
+
+    .gauge-num {
+      font-size: 32px;
+      font-weight: 800;
+      color: #38bdf8;
+      font-feature-settings: "tnum";
+    }
+
+    .gauge-desc {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* 快捷排行榜单 (进度条) */
+    .ranking-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 10px;
+      flex: 1;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .ranking-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .ranking-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .ranking-name {
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ranking-metrics {
+      color: var(--text-dim);
+      font-feature-settings: "tnum";
+    }
+
+    .progress-bar-bg {
+      height: 7px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .progress-bar-fill.prompt {
+      background: #3b82f6;
+    }
+
+    .progress-bar-fill.completion {
+      background: #a855f7;
+    }
+
+    /* 动态 Agent 卡片网格 */
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+
+    .agent-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .agent-card:hover {
+      border-color: var(--border-bright);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .agent-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .agent-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .agent-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--bg-card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .agent-name-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .agent-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .agent-model {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .agent-badge-status {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .agent-badge-status.streaming {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .agent-badge-status.idle {
+      background: rgba(59, 130, 246, 0.12);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.25);
+    }
+
+    .agent-badge-status.offline {
+      background: rgba(100, 116, 139, 0.15);
+      color: #94a3b8;
+      border: 1px solid rgba(100, 116, 139, 0.25);
+    }
+
+    /* 单卡片核心速度与微型折线 */
+    .agent-speed-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-card);
+      border-radius: 10px;
+      padding: 10px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .agent-tps-large {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tps-label {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .tps-num {
+      font-size: 22px;
+      font-weight: 800;
+      color: #38bdf8;
+      font-feature-settings: "tnum";
+    }
+
+    .sparkline-canvas {
+      width: 130px;
+      height: 38px;
+    }
+
+    /* 单卡片细项数据 */
+    .agent-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-item-lbl {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .stat-item-val {
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-feature-settings: "tnum";
+    }
+
+    .agent-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .btn-icon {
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .btn-icon:hover {
+      background: var(--bg-card-hover);
+      color: var(--text-main);
+      border-color: var(--border-bright);
+    }
+
+    .btn-icon.delete:hover {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.4);
+    }
+
+    /* 弹窗通用样式 */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(5px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-bright);
+      border-radius: 14px;
+      width: 90%;
+      max-width: 580px;
+      padding: 24px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      transform: scale(0.96);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-overlay.active .modal-box {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 18px;
+    }
+    .close-btn:hover {
+      color: var(--text-main);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 8px 12px;
+      color: var(--text-main);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .form-input:focus, .form-select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 8px var(--primary-glow);
+    }
+
+    .code-block {
+      background: #090c12;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      color: #93c5fd;
+      overflow-x: auto;
+      max-height: 280px;
+      white-space: pre;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 顶部状态栏与控制区 -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-title">AgentPulse · 实时用量与吞吐监控</div>
+        <div class="brand-subtitle">Multi-Agent Tokens & Throughput Realtime Monitor</div>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div class="status-badge">
+        <div class="status-dot" id="connStatusDot"></div>
+        <span id="connStatusText">实时连接中</span>
+      </div>
+
+      <button class="btn btn-simulator" id="btnToggleSim" onclick="toggleSimulator()">
+        <span>🚀 模拟流量：<strong id="simStatus">开启中</strong></span>
+      </button>
+
+      <button class="btn btn-secondary" onclick="openAddAgentModal()">
+        <span>+ 新增 Agent</span>
+      </button>
+
+      <button class="btn btn-secondary" onclick="openDocsModal()">
+        <span>📖 接入文档</span>
+      </button>
+
+      <button class="btn btn-secondary" onclick="exportDataReport()">
+        <span>📥 导出报表</span>
+      </button>
+
+      <button class="btn btn-secondary" onclick="resetAllMetrics()" title="重置统计数据">
+        <span>🔄 重置</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- KPI 概览面板 -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <div class="kpi-title">实时总输出吞吐 (TPS)</div>
+          <div class="kpi-icon">⚡</div>
+        </div>
+        <div class="kpi-value"><span id="kpiGlobalTps">0.0</span><span class="kpi-unit">tok/s</span></div>
+        <div class="kpi-sub">当前所有 Agent 实时输出速率和</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <div class="kpi-title">累计消耗 Token</div>
+          <div class="kpi-icon">📊</div>
+        </div>
+        <div class="kpi-value"><span id="kpiTotalTokens">0</span></div>
+        <div class="kpi-sub">
+          Prompt: <span class="highlight" id="kpiPromptTokens">0</span> · Comp: <span class="highlight" id="kpiCompTokens">0</span>
+        </div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <div class="kpi-title">累计调用次数</div>
+          <div class="kpi-icon">🔄</div>
+        </div>
+        <div class="kpi-value"><span id="kpiTotalRequests">0</span><span class="kpi-unit">次</span></div>
+        <div class="kpi-sub">成功率: <span class="highlight" id="kpiSuccessRate">100%</span> · 错误: <span id="kpiErrors">0</span></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <div class="kpi-title">活跃 Agent 状态</div>
+          <div class="kpi-icon">🤖</div>
+        </div>
+        <div class="kpi-value"><span id="kpiActiveAgents">0</span><span class="kpi-unit">/ <span id="kpiTotalAgents">0</span></span></div>
+        <div class="kpi-sub">生成中: <span class="highlight" id="kpiStreamingAgents">0</span> · 空闲: <span id="kpiIdleAgents">0</span></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-header">
+          <div class="kpi-title">平均首字延迟 (TTFT)</div>
+          <div class="kpi-icon">⏱️</div>
+        </div>
+        <div class="kpi-value"><span id="kpiAvgTtft">0</span><span class="kpi-unit">ms</span></div>
+        <div class="kpi-sub">首个 Token 到达客户端的平均耗时</div>
+      </div>
+    </div>
+
+    <!-- 核心图表区域 -->
+    <div class="dashboard-row">
+      <!-- 实时速度动态曲线 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">📈 各 Agent 输出速度实时对比曲线 (Tokens/s)</div>
+            <div class="card-subtitle">采样频率 1s · 平滑时间序列</div>
+          </div>
+          <div class="card-tools">
+            <span style="font-size: 11px; color: var(--text-dim);">最近 60 秒滑动窗口</span>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="realtimeChart"></canvas>
+        </div>
+        <div class="chart-legend" id="chartLegendBox">
+          <!-- 动态插入图例 -->
+        </div>
+      </div>
+
+      <!-- 右侧：瞬时速率仪表盘 + 累计消耗排行 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <div class="card-title">🏆 消耗排行与瞬时峰值</div>
+            <div class="card-subtitle">按 Token 占比排序</div>
+          </div>
+        </div>
+
+        <div class="gauge-wrapper">
+          <canvas id="gaugeCanvas"></canvas>
+          <div class="gauge-label">
+            <div class="gauge-num" id="gaugeSpeed">0.0</div>
+            <div class="gauge-desc">峰值瞬时速度 (tok/s)</div>
+          </div>
+        </div>
+
+        <div class="ranking-list" id="rankingListBox">
+          <!-- 动态渲染排行榜条目 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 动态 Agent 网格列表 -->
+    <div class="section-header">
+      <div class="section-title">
+        <span>🧩 运行中 Agent 矩阵卡片</span>
+        <span style="font-size: 12px; color: var(--text-dim); font-weight: normal;">(支持热插拔、动态监测与单独管控)</span>
+      </div>
+      <div>
+        <select class="form-select" id="sortSelect" onchange="renderAgentCards()" style="padding: 4px 10px; font-size: 12px; width: auto;">
+          <option value="tps">按实时速度 (TPS) 排序</option>
+          <option value="tokens">按累计 Token 排序</option>
+          <option value="requests">按调用次数排序</option>
+          <option value="name">按名称排序</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="agent-grid" id="agentGridBox">
+      <!-- 动态插入各 Agent 卡片 -->
+    </div>
+  </main>
+
+  <!-- 弹窗 1：新增 Agent -->
+  <div class="modal-overlay" id="addAgentModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">✨ 手动注册 / 新增 Agent 节点</div>
+        <button class="close-btn" onclick="closeModal('addAgentModal')">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Agent 唯一标识 (ID)</label>
+        <input type="text" class="form-input" id="newAgentId" placeholder="例如: agent-finance-analyst">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Agent 展示名称</label>
+        <input type="text" class="form-input" id="newAgentName" placeholder="例如: 财务分析师 Agent">
+      </div>
+      <div class="form-group">
+        <label class="form-label">底层驱动大模型</label>
+        <select class="form-select" id="newAgentModel">
+          <option value="gpt-4o">OpenAI · GPT-4o</option>
+          <option value="claude-3-5-sonnet">Anthropic · Claude 3.5 Sonnet</option>
+          <option value="gemini-1.5-pro">Google · Gemini 1.5 Pro</option>
+          <option value="deepseek-v3">DeepSeek · DeepSeek-V3</option>
+          <option value="qwen-2.5-72b">Alibaba · Qwen 2.5 72B</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">所属角色类型 / 职责</label>
+        <select class="form-select" id="newAgentRole">
+          <option value="Coder">💻 代码生成 (Coder)</option>
+          <option value="Researcher">🔎 知识检索 (Researcher)</option>
+          <option value="Planner">📋 任务规划 (Planner)</option>
+          <option value="Reviewer">🛡️ 质检验收 (Reviewer)</option>
+          <option value="Chatbot">💬 对话助理 (Chatbot)</option>
+        </select>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+        <button class="btn btn-secondary" onclick="closeModal('addAgentModal')">取消</button>
+        <button class="btn btn-primary" onclick="submitNewAgent()">立即注册</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 弹窗 2：接入说明文档 -->
+  <div class="modal-overlay" id="docsModal">
+    <div class="modal-box" style="max-width: 680px;">
+      <div class="modal-header">
+        <div class="modal-title">📡 数据采集与接入协议 (API SDK)</div>
+        <button class="close-btn" onclick="closeModal('docsModal')">&times;</button>
+      </div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+        本监控台开放标准 HTTP 上报端点，任何 Agent 框架（LangChain, LlamaIndex, AutoGen, CrewAI 或原生 API）均可零侵入打点。
+      </p>
+      
+      <div style="margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #38bdf8;">Python 客户端上报示例 (流式输出/单次调用)：</div>
+      <div class="code-block">import requests
+import time
+
+def report_metric(agent_id, prompt_tokens, comp_tokens, duration_sec, ttft_ms=120):
+    url = "http://127.0.0.1:4190/api/metrics/report"
+    payload = {
+        "agentId": agent_id,
+        "promptTokens": prompt_tokens,
+        "completionTokens": comp_tokens,
+        "durationSec": duration_sec,
+        "ttftMs": ttft_ms,
+        "status": "success"
+    }
+    requests.post(url, json=payload, timeout=1.0)
+
+# 例如在 Agent 执行完成或流式回调结束时调用：
+report_metric("agent-coder", prompt_tokens=520, comp_tokens=340, duration_sec=4.2)</div>
+
+      <div style="margin-top: 14px; margin-bottom: 8px; font-size: 12px; font-weight: 600; color: #a855f7;">cURL 快速测试命令行：</div>
+      <div class="code-block">curl -X POST http://127.0.0.1:4190/api/metrics/report \
+  -H "Content-Type: application/json" \
+  -d '{"agentId":"agent-researcher","promptTokens":300,"completionTokens":180,"durationSec":2.1,"ttftMs":95}'</div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+        <button class="btn btn-secondary" onclick="closeModal('docsModal')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
